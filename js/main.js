@@ -3,10 +3,14 @@ import { HopeAnimator } from './animations.js';
 
 // ===== Auth check =====
 let currentUser = null;
+let isDemo = false;
 
 async function getUser() {
-  const demo = localStorage.getItem('hope_demo_user');
-  if (demo) return JSON.parse(demo);
+  const demo = sessionStorage.getItem('hope_demo_user');
+  if (demo) {
+    isDemo = true;
+    return JSON.parse(demo);
+  }
   if (!supabaseClient) return null;
   const { data: { session } } = await supabaseClient.auth.getSession();
   return session?.user || null;
@@ -28,10 +32,17 @@ const comboCount = document.getElementById('combo-count');
 const levelBadge = document.getElementById('level-badge');
 const hopeBtn = document.getElementById('hope-button');
 const statsBtn = document.getElementById('stats-btn');
+const settingsBtn = document.getElementById('settings-btn');
 const progressBar = document.getElementById('progress-bar');
 const progressRemain = document.getElementById('progress-remain');
 const msgOverlay = document.getElementById('message-overlay');
 const levelAnnounce = document.getElementById('level-announce');
+const settingsModal = document.getElementById('settings-modal');
+const settingsClose = document.getElementById('settings-close');
+const logoutBtn = document.getElementById('logout-btn');
+const userNameEl = document.getElementById('settings-user-name');
+const userEmailEl = document.getElementById('settings-user-email');
+const demoBadgeEl = document.getElementById('settings-demo-badge');
 
 // ===== Canvas setup =====
 const canvas = document.getElementById('main-canvas');
@@ -49,93 +60,60 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 animator.start();
 
-// ===== Load today's count from DB / localStorage =====
+// ===== Load today count (demo: in-memory only) =====
 async function loadTodayCount() {
   const today = new Date().toISOString().split('T')[0];
-
-  if (!supabaseClient || !currentUser || currentUser.id?.startsWith('demo')) {
-    // Use localStorage for demo
-    const stored = localStorage.getItem(`hope_count_${today}_${currentUser?.id || 'demo'}`);
-    todayCount = stored ? parseInt(stored) : 0;
+  if (isDemo || !supabaseClient || !currentUser) {
+    todayCount = 0;
   } else {
     const { data } = await supabaseClient
-      .from('button_clicks')
-      .select('id', { count: 'exact' })
+      .from('button_clicks').select('id', { count: 'exact' })
       .eq('user_id', currentUser.id)
       .gte('clicked_at', today + 'T00:00:00')
       .lte('clicked_at', today + 'T23:59:59');
     todayCount = data?.length || 0;
   }
-
   updateUI();
 }
 
 async function saveClick() {
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-
-  if (!supabaseClient || !currentUser || currentUser.id?.startsWith('demo')) {
-    localStorage.setItem(`hope_count_${today}_${currentUser?.id || 'demo'}`, todayCount.toString());
-    return;
-  }
-
+  if (isDemo || !supabaseClient || !currentUser) return;
   await supabaseClient.from('button_clicks').insert({
     user_id: currentUser.id,
-    clicked_at: now.toISOString()
+    clicked_at: new Date().toISOString()
   });
 }
 
 // ===== UI update =====
 function updateUI() {
-  // Combo
   comboCount.textContent = todayCount;
-
-  // Level calculation
   const newLevel = Math.min(10, Math.floor(todayCount / CLICKS_PER_LEVEL) + 1);
   const inLevelProgress = todayCount % CLICKS_PER_LEVEL;
   const progressPct = (inLevelProgress / CLICKS_PER_LEVEL) * 100;
-  const remain = CLICKS_PER_LEVEL - inLevelProgress;
-
   progressBar.style.setProperty('--progress', progressPct + '%');
-  progressRemain.textContent = remain;
-  levelBadge.textContent = `LV.${newLevel}`;
-
-  // Update animator
+  progressRemain.textContent = CLICKS_PER_LEVEL - inLevelProgress;
+  levelBadge.textContent = 'LV.' + newLevel;
   animator.setLevel(newLevel, inLevelProgress / CLICKS_PER_LEVEL);
-
-  // Level up!
-  if (newLevel !== level) {
-    level = newLevel;
-    showLevelUp();
-  }
+  if (newLevel !== level) { level = newLevel; showLevelUp(); }
 }
 
 function showLevelUp() {
-  const msg = messages.level_messages?.[level] || `레벨 ${level} 달성!`;
-  levelAnnounce.innerHTML = `
-    <div class="lv-num">✨ LEVEL ${level} ✨</div>
-    <div class="lv-msg">${msg}</div>
-  `;
+  const msg = messages.level_messages?.[level] || '레벨 ' + level + ' 달성!';
+  levelAnnounce.innerHTML = '<div class="lv-num">✨ LEVEL ' + level + ' ✨</div><div class="lv-msg">' + msg + '</div>';
   levelAnnounce.classList.add('show');
   setTimeout(() => levelAnnounce.classList.remove('show'), 3000);
 }
 
-// ===== Message display =====
-let msgTimeout;
-let msgIndex = 0;
-
+let msgTimeout, msgIndex = 0;
 function showMessage() {
   const msgs = messages.hope_messages || [];
   if (!msgs.length) return;
-  const msg = msgs[msgIndex % msgs.length];
-  msgIndex++;
-  msgOverlay.textContent = msg;
+  msgOverlay.textContent = msgs[msgIndex++ % msgs.length];
   msgOverlay.classList.add('show');
   clearTimeout(msgTimeout);
   msgTimeout = setTimeout(() => msgOverlay.classList.remove('show'), 2000);
 }
 
-// ===== Float text effect =====
 function spawnFloatText(x, y) {
   const texts = ['+1', '💛', '✨', '희망', '+희망'];
   const el = document.createElement('div');
@@ -147,91 +125,81 @@ function spawnFloatText(x, y) {
   setTimeout(() => el.remove(), 1500);
 }
 
-// ===== Ripple =====
 function spawnRipple(x, y) {
   const el = document.createElement('div');
   el.className = 'ripple';
-  const size = 60;
-  el.style.cssText = `width:${size}px;height:${size}px;left:${x - size / 2}px;top:${y - size / 2}px`;
+  el.style.cssText = 'width:60px;height:60px;left:' + (x - 30) + 'px;top:' + (y - 30) + 'px';
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 700);
 }
 
-// ===== Vibration =====
-function vibrate(pattern) {
-  if ('vibrate' in navigator) navigator.vibrate(pattern);
-}
+function vibrate(pattern) { if ('vibrate' in navigator) navigator.vibrate(pattern); }
 
-// ===== Click Handler =====
-let clickQueue = 0;
-let saveTimeout;
+let clickQueue = 0, saveTimeout;
 
-async function handleClick(e) {
+async function handleClick() {
   const rect = hopeBtn.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
-
   todayCount++;
   clickQueue++;
-
-  // Update combo display immediately
   comboCount.textContent = todayCount;
   comboCount.classList.add('bump');
   setTimeout(() => comboCount.classList.remove('bump'), 150);
-
-  // Button animation
   hopeBtn.classList.add('clicked');
   setTimeout(() => hopeBtn.classList.remove('clicked'), 200);
-
-  // Effects
   spawnRipple(cx, cy);
   vibrate(20);
-
-  // Every 10 clicks: float text
   if (todayCount % 10 === 0) spawnFloatText(cx, cy);
-
-  // Every 50 clicks: show message
   if (todayCount % 50 === 0) showMessage();
-
-  // Level check
   const newLevel = Math.min(10, Math.floor(todayCount / CLICKS_PER_LEVEL) + 1);
-  if (newLevel !== level) {
-    vibrate([100, 50, 100, 50, 200]);
-  }
-
+  if (newLevel !== level) vibrate([100, 50, 100, 50, 200]);
   updateUI();
-
-  // Debounced save
-  clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(async () => {
-    // Save all queued clicks
-    for (let i = 0; i < clickQueue; i++) {
-      await saveClick();
-    }
-    clickQueue = 0;
-  }, 1000);
+  if (!isDemo) {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(async () => {
+      for (let i = 0; i < clickQueue; i++) await saveClick();
+      clickQueue = 0;
+    }, 1000);
+  } else { clickQueue = 0; }
 }
 
 hopeBtn.addEventListener('click', handleClick);
-hopeBtn.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  handleClick(e);
-}, { passive: false });
+hopeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); handleClick(); }, { passive: false });
 
-// ===== Stats button =====
-statsBtn.addEventListener('click', () => {
-  window.location.href = 'stats.html';
+statsBtn.addEventListener('click', () => { window.location.href = 'stats.html'; });
+
+// ===== Settings modal =====
+settingsBtn.addEventListener('click', () => {
+  if (isDemo) {
+    userNameEl.textContent = '희망 여행자';
+    userEmailEl.textContent = '데모 모드 (새로고침 시 초기화)';
+    demoBadgeEl.style.display = 'inline-block';
+  } else if (currentUser) {
+    userNameEl.textContent = currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || '사용자';
+    userEmailEl.textContent = currentUser.email || '';
+    demoBadgeEl.style.display = 'none';
+  }
+  settingsModal.classList.add('open');
+});
+
+settingsClose.addEventListener('click', () => settingsModal.classList.remove('open'));
+settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) settingsModal.classList.remove('open'); });
+
+logoutBtn.addEventListener('click', async () => {
+  if (isDemo) {
+    sessionStorage.removeItem('hope_demo_user');
+  } else if (supabaseClient) {
+    await supabaseClient.auth.signOut();
+  }
+  window.location.href = 'login.html';
 });
 
 // ===== Init =====
 async function init() {
   currentUser = await getUser();
-  if (!currentUser) {
-    window.location.href = 'login.html';
-    return;
-  }
+  if (!currentUser) { window.location.href = 'login.html'; return; }
   await loadTodayCount();
   level = Math.min(10, Math.floor(todayCount / CLICKS_PER_LEVEL) + 1);
 }
-
 init();

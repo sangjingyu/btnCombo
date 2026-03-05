@@ -3,7 +3,7 @@ import { supabaseClient } from './supabase-config.js';
 // Auth
 let currentUser = null;
 async function getUser() {
-  const demo = localStorage.getItem('hope_demo_user');
+  const demo = sessionStorage.getItem('hope_demo_user');
   if (demo) return JSON.parse(demo);
   if (!supabaseClient) return null;
   const { data: { session } } = await supabaseClient.auth.getSession();
@@ -85,15 +85,8 @@ async function loadMonthData() {
   monthData = {};
 
   if (!supabaseClient || !currentUser || currentUser.id?.startsWith('demo')) {
-    // Load from localStorage
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${currentYear}-${padded}-${String(d).padStart(2, '0')}`;
-      const stored = localStorage.getItem(`hope_count_${dateStr}_${currentUser?.id || 'demo'}`);
-      if (stored && parseInt(stored) > 0) {
-        monthData[dateStr] = parseInt(stored);
-      }
-    }
+    // Demo: no persistent data
+    monthData = {};
   } else {
     const { data } = await supabaseClient
       .from('button_clicks')
@@ -131,18 +124,7 @@ async function loadHourlyData(dateStr) {
   const hours = new Array(24).fill(0);
 
   if (!supabaseClient || !currentUser || currentUser.id?.startsWith('demo')) {
-    // Demo: generate fake data for today
-    const today = new Date().toISOString().split('T')[0];
-    if (dateStr === today) {
-      const stored = localStorage.getItem(`hope_count_${dateStr}_${currentUser?.id || 'demo'}`);
-      const total = stored ? parseInt(stored) : 0;
-      if (total > 0) {
-        const nowH = new Date().getHours();
-        for (let i = 0; i <= nowH; i++) {
-          hours[i] = Math.floor(Math.random() * (total / (nowH + 1)) * 2);
-        }
-      }
-    }
+    // Demo: no persistent data
   } else {
     const { data } = await supabaseClient
       .from('button_clicks')
@@ -241,12 +223,8 @@ async function loadTotalCount() {
   let total = 0;
 
   if (!supabaseClient || !currentUser || currentUser.id?.startsWith('demo')) {
-    // Sum all localStorage
-    for (let k in localStorage) {
-      if (k.startsWith('hope_count_') && k.endsWith(currentUser?.id || 'demo')) {
-        total += parseInt(localStorage.getItem(k)) || 0;
-      }
-    }
+    // Demo: no persistent data
+    total = 0;
   } else {
     const { count } = await supabaseClient
       .from('button_clicks')

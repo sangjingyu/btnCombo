@@ -3,8 +3,8 @@
 // GitHub Pages 배포 전에 아래 값을 입력하세요
 // =============================================
 
-const SUPABASE_URL = 'https://phmyoybjdvlfznraznfz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBobXlveWJqZHZsZnpucmF6bmZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NzY4OTcsImV4cCI6MjA4ODI1Mjg5N30.h3ck4dvQ4FHiDUL54p5DLtI0xdwItVj2P1Ahl8IFGlk';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 // Supabase 클라이언트 초기화
 const supabaseClient = window.supabase

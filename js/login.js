@@ -11,7 +11,6 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-// Floating particles
 const particles = Array.from({ length: 60 }, () => ({
   x: Math.random() * window.innerWidth,
   y: Math.random() * window.innerHeight,
@@ -24,21 +23,19 @@ const particles = Array.from({ length: 60 }, () => ({
 function animateBg() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   particles.forEach(p => {
-    p.x += p.vx;
-    p.y += p.vy;
+    p.x += p.vx; p.y += p.vy;
     if (p.y < -10) { p.y = canvas.height + 10; p.x = Math.random() * canvas.width; }
     if (p.x < -10) p.x = canvas.width + 10;
     if (p.x > canvas.width + 10) p.x = -10;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(244,201,122,${p.alpha})`;
+    ctx.fillStyle = 'rgba(244,201,122,' + p.alpha + ')';
     ctx.fill();
   });
   requestAnimationFrame(animateBg);
 }
 animateBg();
 
-// Login
 const googleBtn = document.getElementById('google-login-btn');
 const demoBtn = document.getElementById('demo-btn');
 
@@ -55,8 +52,8 @@ googleBtn.addEventListener('click', async () => {
 });
 
 demoBtn.addEventListener('click', () => {
-  // Demo mode: store a fake user session
-  localStorage.setItem('hope_demo_user', JSON.stringify({
+  // Demo: sessionStorage only — cleared on tab/browser close or refresh
+  sessionStorage.setItem('hope_demo_user', JSON.stringify({
     id: 'demo-user-' + Date.now(),
     name: '희망 여행자',
     email: 'demo@hope.com',
@@ -65,13 +62,8 @@ demoBtn.addEventListener('click', () => {
   window.location.href = 'index.html';
 });
 
-// Check if already logged in
+// Check if already logged in (Supabase session only — no localStorage demo check)
 async function checkAuth() {
-  // Demo mode check
-  if (localStorage.getItem('hope_demo_user')) {
-    window.location.href = 'index.html';
-    return;
-  }
   if (!supabaseClient) return;
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) window.location.href = 'index.html';
