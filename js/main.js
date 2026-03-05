@@ -15,7 +15,7 @@ async function getUser() {
 // ===== State =====
 let todayCount = 0;
 let level = 1;
-const CLICKS_PER_LEVEL = 100;
+const CLICKS_PER_LEVEL = 50;
 
 // Load messages
 let messages = { hope_messages: [], level_messages: {} };
