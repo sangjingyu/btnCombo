@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>희망의 버튼</title>
+  <link rel="stylesheet" href="css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- Top Bar -->
+  <header class="top-bar">
+    <div class="combo-wrap">
+      <span class="combo-label">오늘의 희망</span>
+      <span class="combo-count" id="combo-count">0</span>
+      <span class="combo-unit">번</span>
+    </div>
+    <div class="top-right">
+      <div class="level-badge" id="level-badge">LV.1</div>
+      <button class="stats-btn" id="stats-btn" aria-label="통계">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="12" width="4" height="9"/><rect x="9" y="7" width="4" height="14"/>
+          <rect x="15" y="3" width="4" height="18"/><line x1="1" y1="22" x2="23" y2="22"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Canvas Animation Area -->
+  <main class="canvas-area">
+    <canvas id="main-canvas"></canvas>
+    <div class="message-overlay" id="message-overlay"></div>
+    <div class="level-announce" id="level-announce"></div>
+  </main>
+
+  <!-- Progress Bar -->
+  <div class="progress-wrap">
+    <div class="progress-bar" id="progress-bar"></div>
+    <span class="progress-label" id="progress-label">다음 레벨까지 <span id="progress-remain">500</span>번</span>
+  </div>
+
+  <!-- Bottom Button -->
+  <footer class="button-area">
+    <div class="button-ring ring-3"></div>
+    <div class="button-ring ring-2"></div>
+    <div class="button-ring ring-1"></div>
+    <button class="hope-button" id="hope-button">
+      <span class="btn-inner">
+        <span class="btn-icon">💛</span>
+        <span class="btn-text">희망</span>
+      </span>
+    </button>
+  </footer>
+
+  <script src="js/supabase-config.js" type="module"></script>
+  <script src="js/animations.js" type="module"></script>
+  <script src="js/main.js" type="module"></script>
+</body>
+</html>

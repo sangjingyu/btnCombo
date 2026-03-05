@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>희망의 통계</title>
+  <link rel="stylesheet" href="css/stats.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+  <header class="stats-header">
+    <button class="back-btn" id="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <h1 class="stats-title">나의 희망 기록</h1>
+    <div class="total-wrap">
+      <span class="total-num" id="total-count">—</span>
+      <span class="total-label">총 횟수</span>
+    </div>
+  </header>
+
+  <main class="stats-main">
+    <!-- Calendar -->
+    <section class="calendar-section">
+      <div class="section-header">
+        <button class="month-nav" id="prev-month">‹</button>
+        <h2 class="month-title" id="month-title">2025년 1월</h2>
+        <button class="month-nav" id="next-month">›</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-dow">일</div><div class="cal-dow">월</div>
+        <div class="cal-dow">화</div><div class="cal-dow">수</div>
+        <div class="cal-dow">목</div><div class="cal-dow">금</div>
+        <div class="cal-dow">토</div>
+      </div>
+      <div class="cal-days" id="cal-days"></div>
+    </section>
+
+    <!-- Graph -->
+    <section class="graph-section" id="graph-section">
+      <h3 class="graph-title" id="graph-title">날짜를 선택하세요</h3>
+      <div class="chart-wrap">
+        <canvas id="hourly-chart"></canvas>
+      </div>
+      <p class="graph-empty" id="graph-empty">선택한 날의 기록이 없습니다</p>
+    </section>
+  </main>
+
+  <script src="js/supabase-config.js" type="module"></script>
+  <script src="js/stats.js" type="module"></script>
+</body>
+</html>
