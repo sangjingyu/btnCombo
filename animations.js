@@ -20,6 +20,13 @@ export class HopeAnimator {
     this._rootLines = [];       // tiny roots that grow over time
     this._clickCount = 0;       // raw click count for level1
 
+    // Level 2 — rain state
+    this._rainDrops = [];        // active front-layer drops
+    this._rainDropsBack = [];    // back-layer (dimmer, slower)
+    this._rainSplats = [];       // splash rings at floor
+    this._rainIntensity = 0;     // 0..1, grows with clicks, decays slowly
+    this._rainClickBoost = 0;    // immediate spike per click
+
     // Other levels
     this.particles = [];
     this.trees = [];
@@ -118,6 +125,17 @@ export class HopeAnimator {
         });
       }
     }
+
+    if (this.level === 2) {
+      // Boost rain intensity on click
+      this._rainClickBoost = Math.min(1, this._rainClickBoost + 0.18);
+      this._rainIntensity = Math.min(1, this._rainIntensity + 0.05);
+      // Spawn a burst of drops from click
+      const burstCount = 4 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < burstCount; i++) {
+        this._spawnRainDrop(Math.random() > 0.4);
+      }
+    }
   }
 
   start() {
@@ -208,8 +226,10 @@ export class HopeAnimator {
       c1 = `hsl(25,${30 + intensity * 20}%,${4 + intensity * 6}%)`;
       c2 = `hsl(20,${20 + intensity * 15}%,${6 + intensity * 8}%)`;
     } else if (level === 2) {
-      c1 = `hsl(210,40%,${8 + intensity * 12}%)`;
-      c2 = `hsl(220,50%,${12 + intensity * 8}%)`;
+      // Storm sky: darker & more saturated as rain intensifies with clicks
+      const storm = Math.min(1, intensity + this._rainClickBoost * 0.6);
+      c1 = `hsl(215,${40 + storm * 20}%,${5 + storm * 8}%)`;
+      c2 = `hsl(220,${35 + storm * 25}%,${8 + storm * 10}%)`;
     } else if (level === 3) {
       const dawn = intensity * 0.5;
       c1 = `hsl(${30 + dawn * 20},${60 + dawn * 20}%,${15 + intensity * 20}%)`;
@@ -440,29 +460,151 @@ export class HopeAnimator {
   }
 
   // =============================================
-  // LEVEL 2 — Rain
+  // LEVEL 2 — Rain (stem + splat, front/back layers)
+  // Inspired by: codepen.io/arickle/pen/XKjMZY
+  // Click-reactive: more clicks = heavier rain
   // =============================================
+  _spawnRainDrop(isBack = false) {
+    const { W, H } = this;
+    const ri = this._rainIntensity;
+    // thickness grows with intensity (like "굵어짐")
+    const baseThick = isBack ? 0.5 : 1.0;
+    const thick = baseThick + ri * (isBack ? 1.0 : 2.5);
+    const speed = (isBack ? 4 : 7) + ri * (isBack ? 4 : 8) + Math.random() * 3;
+    const len   = (isBack ? 10 : 18) + ri * (isBack ? 20 : 35) + Math.random() * 10;
+    const drop = {
+      x:     Math.random() * (W + 40) - 20,
+      y:     -len - Math.random() * H * 0.5,
+      vy:    speed,
+      len,
+      thick,
+      alpha: isBack ? 0.15 + ri * 0.25 : 0.35 + ri * 0.45,
+      isBack,
+      splat: false,
+    };
+    if (isBack) this._rainDropsBack.push(drop);
+    else        this._rainDrops.push(drop);
+  }
+
   _drawLevel2() {
     const { ctx, W, H, t, intensity } = this;
-    const count = Math.floor(20 + intensity * 60);
-    ctx.strokeStyle = `rgba(180,210,255,${0.3 + intensity * 0.5})`;
-    ctx.lineWidth = 1 + intensity * 1.5;
-    for (let i = 0; i < count; i++) {
-      const x = ((i * 137.5 + t * 80) % W);
-      const y = ((t * 200 + i * 73) % (H + 40)) - 20;
-      const len = 8 + intensity * 12;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 2, y + len); ctx.stroke();
-    }
-    for (let i = 0; i < 3; i++) {
-      const rx = W * (0.2 + i * 0.3);
-      const phase = (t + i * 1.5) % 2;
-      const rr = phase * 40 * intensity;
+
+    // ── Decay / auto-spawn ──
+    // intensity passively follows click accumulation
+    this._rainIntensity = Math.max(intensity * 0.3, Math.min(1, this._rainIntensity));
+    this._rainClickBoost = Math.max(0, this._rainClickBoost - 0.025);
+
+    const ri = this._rainIntensity + this._rainClickBoost * 0.5;
+    const targetFront = Math.floor(15 + ri * 120);
+    const targetBack  = Math.floor(8  + ri * 60);
+
+    // Spawn to reach target counts
+    while (this._rainDrops.length < targetFront)     this._spawnRainDrop(false);
+    while (this._rainDropsBack.length < targetBack)  this._spawnRainDrop(true);
+
+    // ── Draw back layer (dimmer, behind) ──
+    this._updateAndDrawDrops(this._rainDropsBack, true);
+
+    // ── Fog / rain atmosphere ──
+    this._drawRainAtmosphere(ri);
+
+    // ── Draw front layer ──
+    this._updateAndDrawDrops(this._rainDrops, false);
+
+    // ── Splat rings ──
+    this._drawRainSplats();
+  }
+
+  _updateAndDrawDrops(drops, isBack) {
+    const { ctx, H } = this;
+    const floorY = H - 8;
+
+    for (let i = drops.length - 1; i >= 0; i--) {
+      const d = drops[i];
+      d.y += d.vy;
+
+      if (d.y + d.len >= floorY) {
+        // Hit the floor — spawn splat then remove
+        if (!d.splat) {
+          d.splat = true;
+          if (!isBack) {
+            this._rainSplats.push({
+              x: d.x,
+              y: floorY,
+              r: 0,
+              maxR: 4 + d.thick * 3 + Math.random() * 6,
+              alpha: d.alpha * 0.8,
+              speed: 0.6 + Math.random() * 0.4,
+            });
+          }
+        }
+        drops.splice(i, 1);
+        continue;
+      }
+
+      // Draw stem — gradient fade top→bottom (like the pen's .stem)
+      const x1 = d.x;
+      const y1 = d.y;
+      const x2 = d.x - d.vy * 0.15; // slight angle
+      const y2 = d.y + d.len;
+      const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+      grad.addColorStop(0,   `rgba(174,214,255,0)`);
+      grad.addColorStop(0.5, `rgba(174,214,255,${d.alpha * 0.5})`);
+      grad.addColorStop(1,   `rgba(200,230,255,${d.alpha})`);
       ctx.beginPath();
-      ctx.ellipse(rx, H - 20, rr, rr * 0.3, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(180,210,255,${Math.max(0, 0.5 - phase * 0.25)})`;
-      ctx.lineWidth = 1; ctx.stroke();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = d.thick;
+      ctx.lineCap = 'round';
+      ctx.stroke();
     }
-    this._drawParticles();
+  }
+
+  _drawRainSplats() {
+    const { ctx } = this;
+    for (let i = this._rainSplats.length - 1; i >= 0; i--) {
+      const s = this._rainSplats[i];
+      s.r += s.speed;
+      s.alpha -= 0.04;
+      if (s.alpha <= 0) { this._rainSplats.splice(i, 1); continue; }
+
+      // Dotted ellipse arc (like the pen's .splat border-top dotted)
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, s.r, s.r * 0.35, 0, Math.PI, 0); // top half only
+      ctx.strokeStyle = `rgba(200,230,255,${s.alpha})`;
+      ctx.lineWidth = 1;
+      // Dashed effect
+      ctx.setLineDash([2, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  _drawRainAtmosphere(ri) {
+    const { ctx, W, H } = this;
+    // Subtle blue-grey mist at bottom
+    const mistH = 60 + ri * 80;
+    const mg = ctx.createLinearGradient(0, H - mistH, 0, H);
+    mg.addColorStop(0, 'rgba(120,150,180,0)');
+    mg.addColorStop(1, `rgba(100,130,160,${0.06 + ri * 0.12})`);
+    ctx.fillStyle = mg;
+    ctx.fillRect(0, H - mistH, W, mistH);
+
+    // Rain streaks overlay — gives "sheet of rain" feel at high intensity
+    if (ri > 0.5) {
+      ctx.save();
+      ctx.globalAlpha = (ri - 0.5) * 0.15;
+      const sg = ctx.createLinearGradient(0, 0, 0, H);
+      sg.addColorStop(0, 'rgba(174,214,255,0)');
+      sg.addColorStop(0.5, 'rgba(174,214,255,0.3)');
+      sg.addColorStop(1, 'rgba(174,214,255,0)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
   }
 
   // =============================================
